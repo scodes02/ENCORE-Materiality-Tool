@@ -1,6 +1,6 @@
 Materiality Heat Map Analysis
 
-This R script creates materiality heat maps and workbooks for organisations based by combining their procurement data with ENCORE (Exploring Natural Capital Opportunities, Risks and Exposure) data. 
+This R script creates materiality heat maps and workbooks for organisations by combining their procurement data with ENCORE (Exploring Natural Capital Opportunities, Risks and Exposure) data. 
 The analysis maps procurement spending to nature pressure and ecosystem service dependency materiality ratings.
 
 Overview
