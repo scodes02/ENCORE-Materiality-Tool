@@ -1,14 +1,15 @@
 Materiality Heat Map Analysis
 
-This R script creates materiality heat maps for organizational procurement data using the ENCORE (Exploring Natural Capital Opportunities, Risks and Exposure) framework. 
-The analysis maps procurement spending to environmental pressure and ecosystem service dependency materiality ratings.
+This R script creates materiality heat maps and workbooks for organisations based by combining their procurement data with ENCORE (Exploring Natural Capital Opportunities, Risks and Exposure) data. 
+The analysis maps procurement spending to nature pressure and ecosystem service dependency materiality ratings.
 
 Overview
 
 The script performs nature-related financial risk assessment by:
-- Mapping procurement data (in Australian University Procurement Netwrok (AUPN) to International Standard Industrial Classification (ISIC) codes
-- Applying ENCORE materiality ratings for environmental pressures and ecosystem dependencies
+- Mapping procurement data (in Australian University Procurement Network (AUPN) to International Standard Industrial Classification (ISIC) Rev. 4
+- Applying ENCORE materiality ratings for nature pressures and dependencies
 - Creating visual heat maps that highlight areas of highest nature pressure and dependency
+- Creating workbooks that highlight pressures and dependencies of specific suppliers
 
 Data Requirements
 
@@ -25,40 +26,35 @@ Input Files
 3. ENCORE Data:
    - `07. Pressure mat ratings.csv`: Environmental pressure materiality ratings by ISIC code
    - `06. Dependency mat ratings.csv`: Ecosystem service dependency ratings by ISIC code
-   - '14. EXIOBASE NACE ISIC crosswalk.csv' can be useful if an organisation uses NACE or EXIOBASE classifications of spend
+   - `14. EXIOBASE NACE ISIC crosswalk.csv` can be useful if an organisation have existing NACE or EXIOBASE classifications of spend
 
 Materiality Rating Scale
-	- VH (Very High)
+	-       VH (Very High)
 	-	H (High)
 	-	M (Medium)
 	-	L (Low)
 	-	VL (Very Low)
-	-	ND/N/A
+	-	ND/N/A - No data/Not applicable
 	
 Analysis Methodology
 
-1. Data Integration
+1. Data processing
 - Maps organizational procurement categories to standardized ISIC economic activity codes
 - Joins procurement spending data with ENCORE materiality ratings
 - Handles data quality issues and removes duplicates
 
-2. Materiality Aggregation
-Uses a "worst-case scenario" approach when consolidating multiple ISIC categories:
+2. Materiality aggregation
+Uses a "worst-case scenario" approach when consolidating multiple ISIC categories and underlying materiality ratings:
 - Takes the highest materiality rating across all relevant economic activities
 - Ensures conservative risk assessment for decision-making
-- Important: This approach may inflate apparent risk levels when many categories are consolidated
+- Important: This approach may inflate apparent risk levels and may be uninformative if there are too mnay VH ratings
 
-3. Spend Threshold Filtering
-- Focuses analysis on material spending categories (default: >AUD $2 million)
-- Removes low-materiality environmental categories for cleaner reporting
-- Maintains focus on organizationally relevant environmental factors
-
-4. Visualization
+3. Visualization
 Creates two complementary heat maps:
 - Pressure Heat Map: Shows nature pressures by spend category and magnitude of spend
 - Dependency Heat Map: Shows ecosystem service dependencies by spend category and magnitude of spend
 
-5. Excel workbook
+4. Excel workbook
 Creates an excel workbook that outlines 
 
 Understanding the ENCORE data
