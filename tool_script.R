@@ -40,15 +40,15 @@ pick_highest_level <- function(x, score_levels) {
 
 # 1. Import procurement spend data
 # Note: Update filename to meet organisations needs
-procurement <- read_excel("procurement_classifications/2023 Procurement Data.xlsx")  #### CHANGE FILE HERE ####
+procurement <- read_excel()  #### CHANGE FILE HERE ####
 
 # 2. Import classification mappings
 # Maps procurement categories (AUNP) to ISIC Rev. 4 
-isic_to_procurement <- read_excel("procurement_classifications/AUPN_into_ISIC_Classification.xlsx") #### CHANGE FILE HERE IF NOT IN AUPN ####
+isic_to_procurement <- read_excel("AUPN_into_ISIC_Classification.xlsx") #### CHANGE FILE HERE IF NOT IN AUPN ####
 
 # 3. Import ENCORE data
 # Pressure data
-encore_pressure_csv <- read_csv("encore_download/07. Pressure mat ratings.csv")
+encore_pressure_csv <- read_csv("07. Pressure mat ratings.csv")
 
 # Clean pressure data
 encore_pressure <- encore_pressure_csv |>
@@ -62,7 +62,7 @@ encore_pressure <- encore_pressure_csv |>
              `ISIC Class` != "Fossil fuels energy production"))
 
 # Dependency data
-encore_dependency_csv <- read_csv("encore_download/06. Dependency mat ratings.csv")
+encore_dependency_csv <- read_csv("06. Dependency mat ratings.csv")
 
 # Clean dependency data
 encore_dependency <- encore_dependency_csv |>
@@ -74,7 +74,7 @@ encore_dependency <- encore_dependency_csv |>
 
 # 4. Import ISIC to university spend category mapping
 # Consolidates 77 ISIC categories into 19 university-specific categories
-isic_to_aupn <- read_excel("procurement_classifications/isic_summary_classes.xlsx") #### CHANGE FILE HERE TO MATCH ORGANISATION ####
+isic_to_aupn <- read_excel("isic_summary_classes.xlsx") #### CHANGE FILE HERE TO MATCH ORGANISATION ####
 
 # DATA PROCESSING - LINKING PROCUREMENT TO MATERIALITY RATINGS ----
 
@@ -634,5 +634,5 @@ write_xlsx(
     "Supplier & Pressure" = procurement_pressure_with_supplier_total,
     "Supplier & Dependency" = procurement_dependency_with_supplier_total
   ),
-  path = "workbooks/Materiality Workbook.xlsx"
+  path = "Materiality Workbook.xlsx"
 )
