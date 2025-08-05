@@ -15,7 +15,7 @@ Data Requirements
 
 Input Files
 1. Procurement Data:
-   - Contains organizational spending data with taxonomy classifications in AUPN or relevant classification system
+   - Contains organizational spending data with taxonomy classifications in AUPN or relevant classification system. A dummy dataset is currently used so this workflow works form download. 
 
 2. Classification Mappings:
    - `AUPN_into_ISIC_Classification.xlsx`: Maps organizational procurement categories to ISIC codes
@@ -27,6 +27,8 @@ Input Files
    - `07. Pressure mat ratings.csv`: Environmental pressure materiality ratings by ISIC code
    - `06. Dependency mat ratings.csv`: Ecosystem service dependency ratings by ISIC code
    - `14. EXIOBASE NACE ISIC crosswalk.csv` can be useful if an organisation have existing NACE or EXIOBASE classifications of spend
+   - `16. Upstream links.csv` creates links between economic activities and the upstream value chain to tier 1 and 2 of those activities 
+   - `17. Downstream links.csv` creates links between economic activities and the downstream value chain to tier 1 and 2 of those activities 
 
 Materiality Rating Scale
 	-       VH (Very High)
