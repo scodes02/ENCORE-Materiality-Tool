@@ -8,55 +8,32 @@ Overview
 The script performs nature-related financial risk assessment by:
 - Mapping procurement data in Australian University Procurement Network (AUPN) to International Standard Industrial Classification (ISIC) Rev. 4
 - Applying ENCORE materiality ratings for nature pressures and dependencies
-- Creating visual heat maps that highlight areas of highest nature pressure and dependency
-- Creating workbooks that highlight pressures and dependencies of specific suppliers
+- Creating visual heat maps that highlight areas of highest nature pressure and dependency with tghe ability to only show the most relevant information to create concise visuals 
+- Creating an Excel workbook that highlight the material pressures and dependencies of specific suppliers providing data for enhanced procurement engagement
 
 Data Requirements
 
 Input Files
 1. Procurement Data:
-   - Contains organizational spending data with taxonomy classifications in AUPN or relevant classification system
+   - Contains organizational spending data with taxonomy classifications in AUPN or relevant classification system. As a default, `procurement/dummy_procurement_data.csv` is provided. 
 
 2. Classification Mappings:
    - `AUPN_into_ISIC_Classification.xlsx`: Maps organizational procurement categories to ISIC codes
-   -  If not in AUPN, a new mapping file with a relvant crosswalk table will be needed 
-   - `isic_summary_classes.xlsx`: Consolidates ISIC categories into reporting categories - can be alterred to meet an
-   organisations needs. These ones are aligned with the University of Melbourne's climate active reporting categories.
+   -  If not in AUPN, or a variation different to the AUPN system the University of Melbourne is used, a new mapping file with a relvant crosswalk table will be needed 
 
 3. ENCORE Data:
-   - `07. Pressure mat ratings.csv`: Environmental pressure materiality ratings by ISIC code
-   - `06. Dependency mat ratings.csv`: Ecosystem service dependency ratings by ISIC code
-   - `14. EXIOBASE NACE ISIC crosswalk.csv` can be useful if an organisation have existing NACE or EXIOBASE classifications of spend
+   - `07. Pressure mat ratings.csv` -> tidied into `encore_pressure_ratings.csv`: Environmental pressure materiality ratings by ISIC code
+   - `06. Dependency mat ratings.csv` -> tidied into `encore_pressure_ratings.csv`: Ecosystem service dependency ratings by ISIC code
+   - `14. EXIOBASE NACE ISIC crosswalk.csv`: can be useful if an organisation have existing NACE or EXIOBASE classifications of spend as opposed to AUPN
 
 Materiality Rating Scale
-	-       VH (Very High)
+	-  VH (Very High)
 	-	H (High)
 	-	M (Medium)
 	-	L (Low)
 	-	VL (Very Low)
 	-	ND/N/A - No data/Not applicable
 	
-Analysis Methodology
-
-1. Data processing
-- Maps organizational procurement categories to standardized ISIC economic activity codes
-- Joins procurement spending data with ENCORE materiality ratings
-- Handles data quality issues and removes duplicates
-
-2. Materiality aggregation
-Uses a "worst-case scenario" approach when consolidating multiple ISIC categories and underlying materiality ratings:
-- Takes the highest materiality rating across all relevant economic activities
-- Ensures conservative risk assessment for decision-making
-- Important: This approach may inflate apparent risk levels and may be uninformative if there are too mnay VH ratings
-
-3. Visualization
-Creates two complementary heat maps:
-- Pressure Heat Map: Shows nature pressures by spend category and magnitude of spend
-- Dependency Heat Map: Shows ecosystem service dependencies by spend category and magnitude of spend
-
-4. Excel workbook
-Creates an excel workbook that outlines 
-
 Understanding the ENCORE data
 
 All information is taken directly from https://www.encorenature.org/en

@@ -5,9 +5,11 @@ format: html
 editor: visual
 ---
 
-# Load packages and import the data
+If organisations are looking to adapt this workflow, go to all of the `# CHANGE HERE` flags and ensure these are changed to suit your organisations specific needs
 
-Loads the packages needed for the heatmaps. If not, these will need to be installed for the workflow.
+# Setup workflow
+
+## Load packages
 
 ```{r}
 suppressPackageStartupMessages({
@@ -20,230 +22,48 @@ suppressPackageStartupMessages({
 })
 ```
 
-Load the required datasets for the analysis. This public workflow uses a dummy dataset modeled on the University of Melbourne’s procurement structure, with supplier names anonymised and expenditure values randomly sampled from the original data. If an organisation has already classified its procurement using AUPN categories, they only need to update the procurement data input (line 25) for the full assessment to run seamlessly. If an organisation uses a different classification system, a different economic classification crosswalk table could be found/created and embedded into the workflow.
+## Load functions, colours, and factors
+
+```{r}
+source("setup.R")
+```
+
+## Load data
 
 ```{r}
 # Import procurement data
-procurement <- read_csv("procurement/2023_procurement_data_dummy.csv")
+procurement <- read_csv("procurement/dummy_procurement_data.csv") # CHANGE HERE
 
-# Loads the university's procurement classification (AUPN) and maps it to ISIC Rev. 4
-# Classifications in the Excel file can be updated, and changes will flow through to the code and heatmaps
-isic_to_procurement <- read_excel("procurement/aupn_to_isic.xlsx")
+# Crosswalk table that maps the Australasian Universities Procurement Network (AUPN)
+# economic classifications to The UN's ISIC Rev.4 econonic classifications.
+# If an organisation does not use AUPN, or an adapted version of AUPN,
+# this can be changed to meet that organisations specific classification.
+procurement_to_isic <- read_excel("procurement/aupn_to_isic.xlsx")
 
-# Imports and cleans ENCORE pressure data
-encore_pressure <- read_csv("encore_download/07. Pressure mat ratings.csv") |>
-  slice(2:273) |>
-  select(2:20) |>
-  row_to_names(row_number = 1) |>
-  rename(
-    # Rename due to inconsistencies in the naming of the original ENCORE dataset
-    `ISIC Unique Code` = `ISIC Unique code`
-  ) |>
-  # Filter out any rows of D_35_351 that are NOT Fossil fuels energy production. This is because the
-  # D_35_351 unique code captures multiple classes, and we only want to retain one
-  # Fossil fuels suit Victoria's electricity supply best as most of it is from brown coal
-  filter(
-    !(`ISIC Unique Code` == "D_35_351" &
-      `ISIC Class` != "Fossil fuels energy production")
-  )
+# Imports ENCORE pressure data
+encore_pressure <- read_csv("encore_download/clean/encore_pressure_ratings.csv")
 
-# Imports and cleans ENCORE dependency data
-encore_dependency <- read_csv(
-  "encore_download/06. Dependency mat ratings.csv"
-) |>
-  slice(2:273) |>
-  row_to_names(row_number = 1) |>
-  rename(
-    `ISIC Unique Code` = `ISIC Unique code`
-  ) |>
-  # Filter out any rows of D_35_351 that are NOT Fossil fuels energy production. This is because the
-  # D_35_351 unique code captures multiple classes, and we only want to retain one
-  # Fossil fuels suit Victoria's electricity supply best as most of it is from brown coal
-  filter(
-    !(`ISIC Unique Code` == "D_35_351" &
-      `ISIC Class` != "Fossil fuels energy production")
-  )
+# Imports ENCORE dependency data
+encore_dependency <- read_csv("encore_download/clean/encore_dependency_ratings.csv")
 
-# Import upstream value chain links
-upstream_links <- read_csv("encore_download/16. Upstream links.csv")
+# Imports upstream value chain links
+upstream_links <- read_csv("encore_download/clean/upstream_links.csv")
 
-# Import downstream value chain links
-downstream_links <- read_csv("encore_download/17. Downstream links.csv")
-
-# Classifies unique ISIC codes into "unimelb_categories"
-# Consolidating 77 ISIC categories into 19 university-specific spend categories that align with
-# their exisiting climate active scope 3 emissions categories
-isic_summary_class <- read_excel("procurement/isic_summary_class.xlsx")
+# Imports downstream value chain links
+downstream_links <- read_csv("encore_download/clean/downstream_links.csv")
 ```
 
-# Understanding the ENCORE data
+# Add ISIC classification and materiality ratings to procurement data
 
-All information is taken directly from <https://www.encorenature.org/en>
-
-#### Economic activities
-
-Economic activities were categorized according to the International Standard Industrial Classification of All Economic Activities (ISIC), Revision 4. ISIC divides economic activities into Sections, which are further broken down into Divisions, Groups and Classes. ENCORE uses a list of 271 economic activities which correspond to ISIC Groups, with the exception of selected Groups that have been further broken down to align with ISIC Classes.
-
-#### Materiality ratings
-
-Materiality ratings in ENCORE aim to provide users with an indication of the significance of the potential nature-related dependencies and pressures identified for given economic activities. In ENCORE, “material” is interpreted as synonymous to significant or important to consider in the decision-making process. Fiduciary, regulatory or other dimensions of materiality are not considered in ENCORE materiality ratings.
-
-ENCORE materiality ratings use a five-point rating scale of Very High (VH), High (H), Medium (M), Low (L) and Very Low (VL). They are designed for comparison of materiality across the entire economy, not within a specific sector. Each materiality rating is based on a set of quantitative or qualitative indicators. In some cases, we followed a blended approach with a combination of quantitative and a qualitative assessment of pressures and dependencies. Where there was suitable quantitative data available, use of quantitative indicators was prioritized.
-
-#### Pressure materiality ratings
-
-**Pressures** in ENCORE are defined as "in line with the Driver-Pressure-State-Impact-Response (DPSIR) framework, the ENCORE knowledge base defines the term ‘pressure’ as the use of a measurable quantity of a natural resource or release of measurable quantity of substances, physical and biological agents. The pressures trigger the mechanisms causing change in state of nature (i.e., ecosystems and their components). Some initiatives, such as the Taskforce on Nature-related Financial Disclosures (TNFD) or the Natural Capital Protocol, refer to pressures as 'impact drivers'."
-
-**The Pressures included:**
-
-**Area of freshwater use**\
-- Freshwater area is used for the activity.\
-- Examples of metrics include area of wetland, ponds, lakes, streams, rivers or peatland necessary to provide ecosystem services such as water purification, fish spawning, areas of infrastructure necessary to use rivers and lakes such as bridges, dams, and flood barriers, etc.\
-- Impacts include hydrological changes, freshwater geomorphology and fluvial processes.
-
-**Area of land use**\
-- Activity uses land area.\
-- Example metrics include area of agriculture by type, area of forest plantation by type, area of open cast mine by type, etc.
-
-**Area of seabed use**\
-- Seabed area is used for the activity.\
-- Examples of metrics include area of aquaculture by type, area of seabed mining by type, etc.\
-- Impacts include hydrological changes, freshwater geomorphology and fluvial processes.
-
-**Disturbances (e.g noise, light)**\
-- Activity produces noise or light pollution that has potential to harm organisms.\
-- Examples of metrics include decibels and duration of noise, lumens and duration of light, at site of impact.
-
-**Emissions of GHG**\
-- Activity emits GHG.\
-- Examples include volume of carbon dioxide (CO2), methane (CH4), nitrous oxide (N2O), Sulphur hexafluoride (SF6), Hydrofluorocarbons (HFCs), and perfluorocarbons (PFCs), etc.
-
-**Emissions of non-GHG air pollutants**\
-- Activity emits non GHG air pollutants.\
-- Examples include volume of fine particulate matter (PM2.5) and coarse particulate matter (PM10), Volatile Organic Compounds (VOCs), mono-nitrogen oxides (NO and NO2, commonly referred to as NOx), Sulphur dioxide (SO2), Carbon monoxide (CO), etc.
-
-**Emissions of nutrient pollutants to water and soil**\
-- Activity emits nutrient pollutants that can lead to eutrophication.\
-- Example metrics include volume discharged to receiving water body of nutrients (e.g., nitrates and phosphates).
-
-**Emissions of toxic pollutants to water and soil**\
-- Activity emits toxic pollutants that can directly harm organisms and the environment.\
-- Examples include volume discharged to receiving water body of toxic substances (e.g., heavy metals and chemicals).
-
-**Generation and release of solid waste**\
-- Activity generates and releases solid waste.\
-- Example metrics include volume of waste by classification (i.e., nonhazardous, hazardous, and radioactive), by specific material constituents (e.g., lead, plastic), or by disposal method (e.g., landfill, incineration, recycling, specialist processing).
-
-**Introduction of invasive species**\
-- Activity directly introduces non-native invasive species into areas of operation.
-
-**Other abiotic resource extraction**\
-- Activity extracts abiotic resources.\
-- Examples include volume of mineral extracted.
-
-**Other biotic resource extraction (e.g. fish, timber)**\
-- Activity extracts biotic resources including fish and timber.\
-- Examples of metrics include volume of wild-caught fish by species, number of wild-caught mammals by species, volume of timber by species, etc.
-
-**Volume of water use**\
-- Water is used for the activity.\
-- Example metrics include volume of groundwater consumed, volume of surface water consumed, etc.
-
-#### Dependeny materiality ratings/ecosystem services
-
-**Ecosystem services** were classified according to the UN System of Environmental-Economic Accounting Ecosystem Accounting ([SEEA - EA](https://seea.un.org/ecosystem-accounting)), which comprises three categories of ecosystem service: provisioning services (i.e., those related to the supply of food, fibre, fuel and water); regulating and maintenance services (i.e., those related to activities of filtration, purification, regulation and maintenance of air, water, soil, habitat and climate); and cultural services (i.e., the experiential and non-material services related to the perceived or realized qualities of ecosystems whose existence and functioning enables a range of cultural benefits to be derived by individuals).
-
-**Ecosystem Services Include:**
-
-**Air filtration services**\
-- Air filtration services are the ecosystem contributions to the filtering of air-borne pollutants through the deposition, uptake, fixing and storage of pollutants by ecosystem components, particularly plants, that mitigates the harmful effects of the pollutants. This is most commonly a final ecosystem service.
-
-**Biological control services**\
-- Pest control services are the ecosystem contributions to the reduction in the incidence of species that may prevent or reduce the effects of pests on biomass production processes or other economic and human activity. This may be recorded as a final or intermediate service.\
-- Disease control services are the ecosystem contributions to the reduction in the incidence of species that may prevent or reduce the effects of species on human health. This is most commonly a final ecosystem service.
-
-**Biomass provisioning services**\
-- Biomass provisioning services include the ecosystem contributions to the growth of the following: cultivated plants that are harvested by economic units for various uses including food and fibre production, fodder and energy; grazed biomass that is an input to the growth of cultivated livestock; cultivated livestock and livestock products (e.g. meat, milk, eggs, wool, leather); animals and plants (e.g. fish, shellfish, seaweed) in aquaculture facilities that are harvested for various uses; trees and other woody biomass in both cultivated (plantation) and uncultivated production contexts that are harvested for various uses including timber production and energy; fish and other aquatic biomass that are captured in uncultivated production contexts for various uses; wild animals, plants and other biomass that are captured and harvested in uncultivated production contexts for various uses. Biomass provisioning services are final ecosystem services (except the grazed biomass provisioning services, which may also be an intermediate service to livestock provisioning services).
-
-**Education, scientific and research services**\
-- Education, scientific and research services are the ecosystem contributions, in particular through the biophysical characteristics and qualities of ecosystems, that enable people to use the environment through intellectual interactions with the environment. This is a final ecosystem service.
-
-**Flood mitigation services**\
-- Coastal protection services are the ecosystem contributions of linear elements in the seascape, for instance coral reefs, sand banks, dunes or mangrove ecosystems along the shore, in protecting the shore and thus mitigating the impacts of tidal surges or storms on local communities. This is a final ecosystem service.\
-- River flood mitigation services are the ecosystem contributions of riparian vegetation which provides structure and a physical barrier to high water levels and thus mitigates the impacts of floods on local communities. River flood mitigation services will be supplied together with peak flow mitigation services in providing the benefit of flood protection. This is a final ecosystem service.
-
-**Genetic material services**\
-- Genetic material services are the ecosystem contributions from all biota (including seed, spore or gamete production) that are used by economic units, for example (i) to develop new animal and plant breeds; (ii) in gene synthesis; or (iii) in product development directly using genetic material. This is most commonly recorded as an intermediate service to biomass provisioning.
-
-**Global climate regulation services**\
-- Global climate regulation services are the ecosystem contributions to the regulation of the chemical composition of the atmosphere and oceans that affect global climate through the accumulation and retention of carbon and other GHG (e.g., methane) in ecosystems and the ability of ecosystems to remove (sequester) carbon from the atmosphere. This is a final ecosystem service.
-
-**Local (micro and meso) climate regulation services**\
-- Local climate regulation services are the ecosystem contributions to the regulation of ambient atmospheric conditions (including micro and mesoscale climates) through the presence of vegetation that improves the living conditions for people and supports economic production. Examples include the evaporative cooling provided by urban trees ('green space'), the role of urban water bodies ('blue space') and the contribution of trees in providing shade for humans and livestock. This may be a final or intermediate service.
-
-**Noise attenuation services**\
-- Noise attenuation services are the ecosystem contributions to the reduction in the impact of noise on people that mitigates its harmful or stressful effects. This is most commonly a final ecosystem service.
-
-**Nursery population and habitat maintenance services**\
-- Nursery population and habitat maintenance services are the ecosystem contributions necessary for sustaining populations of species that economic units ultimately use or enjoy either through the maintenance of habitats (e.g., for nurseries or migration) or the protection of natural gene pools. This service is an intermediate service and may input to a number of different final ecosystem services including biomass provision and recreation-related services.
-
-**Other provisioning services - Animal-based energy**\
-- Physical labour is provided by domesticated or commercial species, including oxen, horses, donkeys, goats and elephants. These can be grouped as draught animals, pack animals and mounts.
-
-**Other regulating and maintenance service - Dilution by atmosphere and ecosystems**\
-- Water, both fresh and saline, and the atmosphere can dilute the gases, fluids and solid waste produced by human activity.
-
-**Other regulating and maintenance service - Mediation of sensory impacts (other than noise)**\
-- Vegetation is the main (natural) barrier used to reduce light pollution and other sensory impacts, limiting the impact it can have on human health and the environment.
-
-**Pollination services**\
-- Pollination services are the ecosystem contributions by wild pollinators to the fertilization of crops that maintains or increases the abundance and/or diversity of other species that economic units use or enjoy. This may be recorded as a final or intermediate service.
-
-**Rainfall pattern regulation services (at sub-continental scale)**\
-- Rainfall pattern regulation services are the ecosystem contributions of vegetation, in particular forests, in maintaining rainfall patterns through evapotranspiration at the sub-continental scale. Forests and other vegetation recycle moisture back to the atmosphere where it is available for the generation of rainfall. Rainfall in interior parts of continents fully depends upon this recycling. This may be a final or intermediate service.
-
-**Recreation-related services**\
-- Recreation-related services are the ecosystem contributions, in particular through the biophysical characteristics and qualities of ecosystems, that enable people to use and enjoy the environment through direct, in-situ, physical and experiential interactions with the environment. This includes services to both locals and non-locals (i.e. visitors, including tourists). Recreation-related services may also be supplied to those undertaking recreational fishing and hunting. This is a final ecosystem service.
-
-**Soil and sediment retention services**\
-- Soil erosion control services are the ecosystem contributions, particularly the stabilising effects of vegetation, that reduce the loss of soil (and sediment) and support use of the environment (e.g., agricultural activity, water supply). This may be recorded as a final or intermediate service.\
-- Landslide mitigation services are the ecosystem contributions, particularly the stabilising effects of vegetation, that mitigates or prevents potential damage to human health and safety and damaging effects to buildings and infrastructure that arise from the mass movement (wasting) of soil, rock and snow. This is a final ecosystem service.
-
-**Soil quality regulation services**\
-- Soil quality regulation services are the ecosystem contributions to the decomposition of organic and inorganic materials and to the fertility and characteristics of soils, e.g., for input to biomass production. This is most commonly recorded as an intermediate service.
-
-**Solid waste remediation**\
-- Solid waste remediation services are the ecosystem contributions to the transformation of organic or inorganic substances, through the action of micro-organisms, algae, plants and animals that mitigates their harmful effects. This may be recorded as a final or intermediate service.
-
-**Spiritual, artistic and symbolic services**\
-- Spiritual artistic and symbolic services are the ecosystem contributions, in particular through the biophysical characteristics and qualities of ecosystems, that are recognised by people for their cultural, historical, aesthetic, sacred or religious significance. These services may underpin people's cultural identity and may inspire people to express themselves through various artistic media. This is a final ecosystem service.
-
-**Storm mitigation services**\
-- Storm mitigation services are the ecosystem contributions of vegetation including linear elements, in mitigating the impacts of wind, sand and other storms (other than water related events) on local communities. This is a final ecosystem service.
-
-**Visual amenity services**\
-- Visual amenity services are the ecosystem contributions to local living conditions, in particular through the biophysical characteristics and qualities of ecosystems that provide sensory benefits, especially visual. This service combines with other ecosystem services, including recreation-related services and noise attenuation services to underpin amenity values. This is a final ecosystem service.
-
-**Water flow regulation services**\
-- Baseline flow maintenance services are the ecosystem contributions to the regulation of river flows and groundwater and lake water tables. They are derived from the ability of ecosystems to absorb and store water, and gradually release water during dry seasons or periods through evapotranspiration and hence secure a regular flow of water. This may be recorded as a final or intermediate ecosystem service.\
-- Peak flow mitigation services are the ecosystem contributions to the regulation of river flows and groundwater and lake water tables. They are derived from the ability of ecosystems to absorb and store water, and hence mitigate the effects of flood and other extreme water-related events. Peak flow mitigation services will be supplied together with river flood mitigation services in providing the benefit of flood protection. This is a final ecosystem service.
-
-**Water purification services**\
-- Water purification services are the ecosystem contributions to the restoration and maintenance of the chemical condition of surface water and groundwater bodies through the breakdown or removal of nutrients and other pollutants by ecosystem components that mitigate the harmful effects of the pollutants on human use or health. This may be recorded as a final or intermediate ecosystem service.
-
-**Water supply**\
-- Water supply services reflect the combined ecosystem contributions of water flow regulation, water purification, and other ecosystem services to the supply of water of appropriate quality to users for various uses including household consumption. This is a final ecosystem service.
-
-## Clean the data for analysis
-
-Add the ISIC classifications to the procurement data
+## Add the ISIC classifications to the procurement data
 
 ```{r}
 # Create a column called Mega_L1_2_3 that can be used to map the procurement spend
 # to the ISIC Classifications. The reason Mega_L1_2_3 is created is that there
 # are duplicate L3 titles, so we must combine Mega, L1, L2, and L3 to ensure accurate matching.
+# This works for data that is in the AUPN classification
 
-# 1. Create a combined key in your procurement data
+# 1. Create a combined key within the procurement data
 procurement_mapping <- procurement |>
   mutate(
     Mega_L1_2_3 = str_c(
@@ -264,8 +84,8 @@ procurement_mapping <- procurement |>
     Mega_L1_2_3
   )
 
-# 2. Create the same combined key in your ISIC mapping data
-isic_mapping <- isic_to_procurement |>
+# 2. Create the same combined key in the AUPN to ISIC crosswalk table
+isic_mapping <- procurement_to_isic |>
   mutate(
     Mega_L1_2_3 = str_c(
       `Mega Category (Taxonomy)`,
@@ -286,7 +106,7 @@ isic_mapping <- isic_to_procurement |>
     Comments
   )
 
-# 3. Perform the join on the Mega_L1_2_3 key
+# 3. Join the procurement data with the ISIC crosswalk table
 procurement_to_isic <- left_join(
   procurement_mapping,
   isic_mapping,
@@ -294,14 +114,14 @@ procurement_to_isic <- left_join(
 ) |>
   select(-Mega_L1_2_3) # remove the merged key if you don't need it anymore
 
-# Duplicate rows?
+# Check for duplicate rows? Zero using the dummy data
 nrow(procurement_to_isic) - nrow(procurement_mapping)
 ```
 
-Add the dependency and pressure ratings to the datasets
+## Add the materiality ratings to the procurement data
 
 ```{r}
-# This adds the ENCORE pressure ratings to the procurement data and removes duplicated columns in a new dataframe
+# Adding pressure ratings to procurement
 procurement_pressure <- procurement_to_isic |>
   inner_join(
     encore_pressure,
@@ -317,10 +137,10 @@ procurement_pressure <- procurement_to_isic |>
     -`Comments`
   )
 
-# Duplicate rows? Negative values are fine.
+# Duplicate rows?
 nrow(procurement_pressure) - nrow(procurement_to_isic)
 
-# This adds the ENCORE dependency ratings to the procurement data and removes duplicated columns in a new dataframe
+# Adding dependency ratings to procurement
 procurement_dependency <- procurement_to_isic |>
   inner_join(
     encore_dependency,
@@ -340,749 +160,199 @@ procurement_dependency <- procurement_to_isic |>
 nrow(procurement_pressure) - nrow(procurement_to_isic)
 ```
 
-## Heatmap colours
+# Create heatmaps
+
+## Pressure heatmap
 
 ```{r}
-# Color-blind-friendly pressure colors
-pressure_colors <- c(
-  "ND" = "#D3D3D3", # Light Grey (No Data)
-  "N/A" = "#D3D3D3", # Light Grey (Not Applicable)
-  "VL" = "#88CCEE", # Light Blue (Very Low Materiality)
-  "L" = "#44AA99", # Teal-Green (Low Materiality)
-  "M" = "#DDCC77", # Yellow (Medium Materiality)
-  "H" = "#E69F00", # Orange (High Materiality)
-  "VH" = "#882255" # Dark Red (Very High Materiality, indicating BAD)
-)
-```
-
-# Heatmap ENCORE data - Not for the report
-
-### Pressure heatmap
-
-Create just the heat-map of the ENCORE Pressure data that is relevant to the university.
-
-```{r}
-# Select relevant aspects of the data
-pressure_data <- procurement_pressure |>
-  select(
-    `ISIC Group`,
-    `ISIC Class`,
-    `Disturbances (e.g noise, light)`,
-    `Area of freshwater use`,
-    `Emissions of GHG`,
-    `Area of seabed use`,
-    `Emissions of non-GHG air pollutants`,
-    `Other biotic resource extraction (e.g. fish, timber)`,
-    `Other abiotic resource extraction`,
-    `Emissions of toxic soil and water pollutants`,
-    `Emissions of nutrient soil and water pollutants`,
-    `Generation and release of solid waste`,
-    `Area of land use`,
-    `Volume of water use`,
-    `Introduction of invasive species`
-  ) |>
-  group_by(`ISIC Group`, `ISIC Class`) |>
-  slice(1) |> # Keeps only the first row for each group
-  ungroup() |> # Removes grouping to return a standard tibble
-  mutate(
-    `ISIC Group and Class` = ifelse(
-      !is.na(`ISIC Class`),
-      str_c(`ISIC Group`, " (", `ISIC Class`, ")"),
-      `ISIC Group`
-    )
-  ) |>
-  select(-`ISIC Group`, -`ISIC Class`)
-
-# Tidy the data in a format for plotting
-pressure_data_long <- pressure_data |>
-  pivot_longer(
-    cols = -`ISIC Group and Class`,
-    names_to = "Category",
-    values_to = "Value"
-  )
-
-# Make the plot
-full_pressure_map <- ggplot(
-  pressure_data_long,
-  aes(
-    x = Category,
-    y = factor(
-      `ISIC Group and Class`,
-      levels = rev(unique(`ISIC Group and Class`))
-    ),
-    fill = Value
-  )
-) +
-  geom_tile(color = "white") +
-  scale_fill_manual(values = pressure_colors) +
-  labs(
-    title = "Heatmap of Pressures by ISIC Group",
-    x = "Pressure Category",
-    y = "ISIC Group",
-    fill = "Level"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid = element_blank(),
-    plot.title = element_text(hjust = 0.5)
-  )
-
-# Save an interactive plot to an object
-interactive_plot_pressure <- ggplotly(
-  full_pressure_map,
-  width = 1700,
-  height = 2000
-)
-
-# Print interactive plot
-interactive_plot_pressure
-```
-
-### Dependency heatmap
-
-Create just the heat-map of the ENCORE Dependency data that is relevant to the university. Because there is so much data, they don't appear in the Quarto document. They have to be opened to a large screen.
-
-```{r}
-# Select relevant data
-dependency_data <- procurement_dependency |>
-  select(
-    `ISIC Group`,
-    `ISIC Class`,
-    `Other provisioning services - Animal-based energy`,
-    `Biomass provisioning`,
-    `Solid waste remediation`,
-    `Soil and sediment retention`,
-    `Water purification`,
-    `Soil quality regulation`,
-    `Other regulating and maintenance service - Dilution by atmosphere and ecosystems`,
-    `Biological control`,
-    `Air Filtration`,
-    `Flood mitigation services`,
-    `Genetic material`,
-    `Global climate regulation`,
-    `Water supply`,
-    `Nursery population and habitat maintenance`,
-    `Noise attenuation`,
-    `Other regulating and maintenance service - Mediation of sensory impacts (other than noise)`,
-    `Local (micro and meso) climate regulation`,
-    `Pollination`,
-    `Storm mitigation`,
-    `Water flow regulation`,
-    `Rainfall pattern regulation`,
-    `Recreation related services`,
-    `Visual amenity services`,
-    `Education, scientific and research services`,
-    `Spiritual, artistic and symbolic services`
-  ) |>
-  group_by(`ISIC Group`, `ISIC Class`) |>
-  slice(1) |>
-  ungroup() |>
-  mutate(
-    `ISIC Group and Class` = ifelse(
-      !is.na(`ISIC Class`),
-      str_c(`ISIC Group`, " (", `ISIC Class`, ")"),
-      `ISIC Group`
-    )
-  ) |>
-  select(-`ISIC Group`, -`ISIC Class`)
-
-# Tidy the data
-dependency_data_long <- dependency_data |>
-  pivot_longer(
-    cols = -`ISIC Group and Class`,
-    names_to = "Category",
-    values_to = "Value"
-  )
-
-# Create the plots
-full_dependency_map <- ggplot(
-  dependency_data_long,
-  aes(
-    x = Category,
-    y = factor(
-      `ISIC Group and Class`,
-      levels = rev(unique(`ISIC Group and Class`))
-    ),
-    fill = Value
-  )
-) +
-  geom_tile(color = "white") +
-  scale_fill_manual(values = pressure_colors) +
-  labs(
-    title = "Heatmap of Dependency by ISIC Group",
-    x = "Pressure Category",
-    y = "ISIC Group",
-    fill = "Level"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid = element_blank(),
-    plot.title = element_text(hjust = 0.5)
-  )
-
-# Save an interactive plot to an object
-interactive_plot_dependency <- ggplotly(
-  full_dependency_map,
-  width = 1700,
-  height = 2000
-)
-
-# Print interactive plot
-interactive_plot_dependency
-```
-
-# Classify ISIC data into Melbourne University spend categories
-
-As shown by the `full_pressure_map` and `full_dependency_map`, there is a high number of individual economic categories, and too many dependency and pressure categories for complete inclusion in the main body of a sustainability report. For the purposes of a reader friendly report, we have to find a way to summarise the heat maps, only retaining the most important information.
-
-This section does this by extracting the classifications defined in the prior loaded `isic_summary_class` dataframe. The `code_isic` dataframe maps the 77 Unique ISIC categories that relate to the University of Melbourne's procurement spend into 19 `CA_category_and_unimelb` categories. These `CA_category_and_unimelb` are titled to align with the university's existing Climate Active classifications, but deviates where necessary.
-
-Once all the procurement is classified into these categories, the script summarises how the underlying ENCORE materiality ratings assigned to the the University of Melbourne's (or any organisations) procurement. It does this by taking the highest score for each pressure and dependency category. This means that the final heatmaps provide a "worst-case" scenario snapshot of materiality.
-
-Consulting projects at the Melbourne Biodiversity Institute have highlighted that the ‘worst-case’ summarization approach can distort materiality ratings when numerous ISIC categories are condensed into a small number of summary categories. This often results in heatmaps with an unusually high count of Very High materiality ratings. This is an important consideration. The process of categorising the ENCORE datasets remains highly subjective at this stage, and organisations should validate the final outputs with experts to ensure they represent reasonable materiality results.
-
-```{r}
-# Import the isic_summary_class lookup table as `code_isic`
-code_isic <- isic_summary_class |>
-  select(`ISIC Unique Code`, CA_category_and_unimelb) |>
-  distinct(`ISIC Unique Code`, .keep_all = TRUE)
-
-# Join with the procurement data
-procurement_pressure_unimelb <- inner_join(
-  procurement_pressure,
-  code_isic,
-  by = "ISIC Unique Code"
-)
-
-# Check for duplicates
-nrow(procurement_pressure_unimelb) - nrow(procurement_pressure)
-
-# Join with the procurement data
-procurement_dependency_unimelb <- inner_join(
-  procurement_dependency,
-  code_isic,
-  by = "ISIC Unique Code"
-)
-
-# Check for duplicates
-nrow(procurement_dependency_unimelb) - nrow(procurement_dependency)
-
-# Define all of the ENCORE pressure categories
-pressure_score_cols <- c(
-  "Disturbances (e.g noise, light)",
-  "Area of freshwater use",
-  "Emissions of GHG",
-  "Area of seabed use",
-  "Emissions of non-GHG air pollutants",
-  "Other biotic resource extraction (e.g. fish, timber)",
-  "Other abiotic resource extraction",
-  "Emissions of toxic soil and water pollutants",
-  "Emissions of nutrient soil and water pollutants",
-  "Generation and release of solid waste",
-  "Area of land use",
-  "Volume of water use",
-  "Introduction of invasive species"
-)
-
-# Define all of the ENCORE dependency categories
-dependency_score_cols <- c(
-  "Other provisioning services - Animal-based energy",
-  "Biomass provisioning",
-  "Solid waste remediation",
-  "Soil and sediment retention",
-  "Water purification",
-  "Soil quality regulation",
-  "Other regulating and maintenance service - Dilution by atmosphere and ecosystems",
-  "Biological control",
-  "Air Filtration",
-  "Flood mitigation services",
-  "Genetic material",
-  "Global climate regulation",
-  "Water supply",
-  "Nursery population and habitat maintenance",
-  "Noise attenuation",
-  "Other regulating and maintenance service - Mediation of sensory impacts (other than noise)",
-  "Local (micro and meso) climate regulation",
-  "Pollination",
-  "Storm mitigation",
-  "Water flow regulation",
-  "Rainfall pattern regulation",
-  "Recreation related services",
-  "Visual amenity services",
-  "Education, scientific and research services",
-  "Spiritual, artistic and symbolic services"
-)
-
-# Define the materiality ratings as ordered factors from 'lowest' to 'highest'.
-score_levels <- c("ND", "N/A", "VL", "L", "M", "H", "VH")
-
-# Define a function that takes the highest value in each column
-pick_highest_level <- function(x, score_levels) {
-  x_char <- as.character(x)
-  x_idx <- match(x_char, score_levels)
-  if (all(is.na(x_idx))) {
-    return(ND)
-  } else {
-    max_idx <- max(x_idx, na.rm = TRUE)
-    return(score_levels[max_idx])
-  }
-}
-
-# For pressure data
-unimelb_pressure_data <- procurement_pressure_unimelb |>
-  group_by(CA_category_and_unimelb) |> # CHANGEHERE
+# 1. Aggregate worst-case pressure scores and total spend per ISIC Division
+summarised_pressure_data <- procurement_pressure |>
+  group_by(`ISIC Division`) |>
   summarise(
-    # Sum Spend column (only numeric)
     across(where(is.numeric), ~ sum(.x, na.rm = TRUE)),
-    # Take the maximum factor value (highest) among pressure columns
-    across(
-      all_of(pressure_score_cols),
-      ~ pick_highest_level(.x, score_levels)
-    )
+    across(all_of(pressure_score_cols), ~ pick_highest_level(.x, score_levels)),
+    .groups = "drop"
   ) |>
-  ungroup() |>
-  select(
-    CA_category_and_unimelb,
-    Spend,
-    all_of(pressure_score_cols)
-  )
+  select(`ISIC Division`, Spend, all_of(pressure_score_cols))
 
-# For the dependency data
-unimelb_dependency_data <- procurement_dependency_unimelb |>
-  group_by(CA_category_and_unimelb) |>
-  summarise(
-    # Sum Spend column (only numeric)
-    across(where(is.numeric), ~ sum(.x, na.rm = TRUE)),
-    # Take the maximum factor value (highest) among dependency columns
-    across(
-      all_of(dependency_score_cols),
-      ~ pick_highest_level(.x, score_levels)
-    )
-  ) |>
-  ungroup() |>
-  select(
-    CA_category_and_unimelb,
-    Spend,
-    all_of(dependency_score_cols)
-  )
-
-# Tidy the datasets and adds percentage_spend column based on the procurement spend
-
-# Tidys the pressure data for heatmap plotting. Also adds a percentage spend column.
-unimelb_pressure_impact <- unimelb_pressure_data |>
+# 2. Reshape to long format and compute share of total spend
+summarised_pressure_data_long <- summarised_pressure_data |>
   pivot_longer(
-    cols = c(-Spend, -CA_category_and_unimelb),
+    cols = -(c(Spend, `ISIC Division`)),
     names_to = "Category",
     values_to = "Value"
   ) |>
   mutate(
-    percentage_spend = (Spend / sum(procurement$Spend, na.rm = TRUE) * 100) # this calculates the percentage spend.
-  ) |>
-  select(CA_category_and_unimelb, Spend, percentage_spend, Category, Value)
+    percentage_spend = Spend / sum(procurement$Spend, na.rm = TRUE) * 100
+  )
 
-# Tidys the dependency data for heatmap plotting. Also adds a percentage spend column
-unimelb_dependency_impact <- unimelb_dependency_data |>
-  pivot_longer(
-    cols = c(-Spend, -CA_category_and_unimelb),
-    names_to = "Category",
-    values_to = "Value"
-  ) |>
-  mutate(
-    percentage_spend = (Spend / sum(procurement$Spend, na.rm = TRUE) * 100) # this calculates the percentage spend.
-  ) |>
-  select(CA_category_and_unimelb, Spend, percentage_spend, Category, Value)
-```
-
-# Final Data Cleaning and Plot Production
-
-This section will produce the final heatmaps. It will filter and deliberately remove spend, pressure, and dependency segments that will immaterial for the first sustainability report. This section MUST BE REVIEWED annually to make sure it aligns with the university's priorities. Further, other universities/organisations that choose to employ this workflow will need to alter this section.
-
-## Pressure Heatmap
-
-The following adjustments to the impact data will be made:
-
--   Filtering `Spend` to only include categories exceeding AUD2e6, defining that as a material threshold.
-
--   Removing the following impact columns:
-
-1.  Other abiotic resource extraction - Justification: Not material for many areas.
-
-2.  Other biotic resource extraction (e.g. fish, timber) - Justification: Not material for many areas.
-
-```{r}
-unimelb_pressure_impact_2023 <- unimelb_pressure_impact |>
-  filter(Spend > 2e6) |>
+# 3. Apply materiality threshold and drop irrelevant categories
+pressure_plot_dat <- summarised_pressure_data_long |>
   filter(
+    Spend > 4e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
     !Category %in%
       c(
+        # CHANGE HERE
+        # Remove pressure categories that are less relevant to your organisation
         "Other abiotic resource extraction",
         "Other biotic resource extraction (e.g. fish, timber)"
       )
   ) |>
   mutate(
-    percentage_spend = case_when(
-      duplicated(percentage_spend) ~ 0,
-      TRUE ~ percentage_spend
-    ), # Keep original value otherwise
-    Value = if_else(Value %in% c("N/A", "ND"), "ND", Value) # Make N/A and ND, ND to simplify the plot
-  )
-
-## Percetage of total spend
-
-# Total spend of procurement
-procurement_spend <- procurement |>
-  summarise(`Total Spend` = sum(Spend, na.rm = TRUE))
-
-# Total spend of the included categories
-unimelb_pressure_impact_2023_Spend_total <- unimelb_pressure_impact_2023 |>
-  distinct(Spend) |>
-  summarise(`Total Spend` = sum(Spend, na.rm = TRUE))
-```
-
-#### Create the heatmap
-
-```{r}
-# Re-order so highest spend is first in the data and set factor levels in reverse so the highest is at the top
-unimelb_pressure_impact_ordered <- unimelb_pressure_impact_2023 |>
+    percentage_spend = if_else(duplicated(percentage_spend), 0, percentage_spend),
+    Value = if_else(Value %in% c("N/A", "ND"), "ND", Value)
+  ) |>
   arrange(desc(Spend)) |>
   mutate(
-    CA_category_and_unimelb = factor(
-      CA_category_and_unimelb,
-      levels = rev(unique(CA_category_and_unimelb))
-    )
+    `ISIC Division` = factor(`ISIC Division`, levels = rev(unique(`ISIC Division`))),
+    Category = factor(Category, levels = pressure_score_cols)
   )
 
-# Creates the heatmap
-p_heatmap <- ggplot(
-  unimelb_pressure_impact_ordered,
-  aes(
-    x = Category,
-    y = CA_category_and_unimelb,
-    fill = Value
-  )
-) +
-  geom_tile(color = "white", size = 0.6) +
+
+# 4. Heat-map and spend bar
+p_heatmap <- ggplot(pressure_plot_dat, aes(Category, `ISIC Division`, fill = Value)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
   scale_fill_manual(
     values = pressure_colors,
     drop = FALSE,
-    name = "Materiality\nScore",
     breaks = c("ND", "VL", "L", "M", "H", "VH"),
-    labels = c(
-      "No Data",
-      "Very Low",
-      "Low",
-      "Medium",
-      "High",
-      "Very High"
-    )
+    labels = c("No Data", "Very Low", "Low", "Medium", "High", "Very High"),
+    name = "Materiality\nScore"
   ) +
-  labs(
-    x = "Pressure Category",
-    y = "Spend Category",
-    fill = "Level"
-  ) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  labs(x = "Pressure Category", y = "Spend Category (ISIC Rev.4 Division)") +
+  scale_x_discrete(labels = \(x) str_wrap(x, 20)) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 30)) +
   theme_minimal(base_size = 12) +
   theme(
-    axis.text.x = element_text(
-      angle = 45,
-      hjust = 1,
-      color = "black",
-      size = 12
-    ),
-    axis.text.y = element_text(color = "black", size = 12),
-    axis.title.x = element_text(face = "bold"),
-    axis.title.y = element_text(face = "bold"),
-    plot.title = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank(),
     legend.position = "bottom",
-    legend.direction = "horizontal",
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8)
+    legend.direction = "horizontal"
   ) +
-  guides(
-    fill = guide_legend(
-      title.position = "left",
-      nrow = 1,
-      byrow = TRUE,
-      label.position = "top",
-      keywidth = 2.2,
-      keyheight = 1.2
-    )
-  )
+  guides(fill = guide_legend(title.position = "left", nrow = 1, byrow = TRUE))
 
-# Creates the bar plot of expenditure
-p_bar <- ggplot(
-  unimelb_pressure_impact_ordered,
-  aes(
-    x = percentage_spend,
-    y = CA_category_and_unimelb
-  )
-) +
-  geom_col(fill = "#C8C8C8", color = NA) +
-  labs(
-    x = str_wrap("Percentage of Total Procurement Spend", width = 30),
-    y = NULL
-  ) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 20)) +
+p_bar <- ggplot(pressure_plot_dat, aes(percentage_spend, `ISIC Division`)) +
+  geom_col(fill = "#C8C8C8") +
+  labs(x = "Percentage of Total Procurement Spend", y = NULL) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 20)) +
   theme_minimal(base_size = 12) +
   theme(
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
-    plot.title = element_blank(),
-    axis.title.x = element_text(face = "bold"),
-    panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank()
   )
 
-# Combines the plots
-combined_plot_p <- p_heatmap +
-  p_bar +
-  plot_layout(widths = c(5, 1)) +
-  plot_annotation(
-    title = "Dependency Heatmap - BASED ON RANDOM DATA",
-    theme = theme(
-      plot.title = element_text(size = 14, face = "bold"),
-      plot.background = element_rect(fill = "white", color = NA)
-    )
-  )
+combined_plot_p <- p_heatmap + p_bar + plot_layout(widths = c(5, 1))
 
-# Display the combined plot
-combined_plot_p
+print(combined_plot_p)
 
 ggsave(
-  filename = "sample_pressure_plot.pdf",
-  plot = combined_plot_p,
-  width = 17,
+  "sample_outputs/sample_pressure_plot.pdf",
+  combined_plot_p,
+  width = 15,
   height = 10,
   dpi = 300
 )
 ```
 
-## Dependency Heatmap
-
-The following adjustments to the impact data will be made:
-
--   Filtering Spend to total transactions exceeding AUD2e6
-
--   Removing the following impact columns:
-
-1.  Education, scientific and research services - Justification: Not nature related
-
-2.  Genetic material - Justification: Low materilaity.
-
-3.  Nursery population and habitat maintenance - Justification: Low materilaity and strange name.
-
-4.  Other provisioning services - Animal-based energy - Justification: Low materilaity and seems to have low importance to Australia.
-
-5.  Other regulating and maintenance service - Dilution by atmosphere and ecosystems. - Justification: Low materiality and seems less relevant to the university.
-
-6.  Other regulating and maintenance service - Mediation of sensory impacts (other than noise). - Justification: Low materiality and seems less relevant to the university.
-
-7.  Pollination - Justification: Low materiality (strangely). Materiality must be in the upstream aspects of the value chain.
-
-8.  Recreation related services - Justification: No direct relation to the university and nature dependence.
-
-9.  Spiritual, artistic and symbolic services - Justification: No direct relation to the university
-
-10. Local (micro and meso) climate regulation - Justification: Takes up space - climate is already there
-
-11. Soil quality regulation - Justification: Low materilality.
-
-12. Visual amenity services - Justification: Stands out as having very high materiality for a few sectors, but seems irrelevant to how the university thinks about its dependencies.
-
-13. Recreation related services - Justification: Stands out as having very high materiality for a few sectors, but seems irrelevant to how the university thinks about its dependencies.
-
-14. Noise attenuation - Justification: Takes up space and seems insignificant to the university.
-
-15. Biomass provisioning- Justification: Takes up space and seems insignificant to the university.
+## Dependency heatmap
 
 ```{r}
-unimelb_dependency_impact_2023 <- unimelb_dependency_impact |>
+# 1. Aggregate worst-case dependency scores and total spend per ISIC Division
+summarised_dependency_data <- procurement_dependency |>
+  group_by(`ISIC Division`) |>
+  summarise(
+    across(where(is.numeric), ~ sum(.x, na.rm = TRUE)),
+    across(all_of(dependency_score_cols), ~ pick_highest_level(.x, score_levels)),
+    .groups = "drop"
+  ) |>
+  select(
+    `ISIC Division`,
+    Spend,
+    all_of(dependency_score_cols)
+  )
+
+# 2. Reshape to long format and compute share of total spend
+summarised_dependency_data_long <- summarised_dependency_data |>
+  pivot_longer(
+    cols = -(c(Spend, `ISIC Division`)),
+    names_to = "Category",
+    values_to = "Value"
+  ) |>
+  mutate(
+    percentage_spend = Spend / sum(procurement$Spend, na.rm = TRUE) * 100
+  )
+
+# 3. Apply materiality threshold and drop irrelevant categories
+dependency_plot_dat <- summarised_dependency_data_long |>
   filter(
-    Spend > 2e6,
+    Spend > 4e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
     !Category %in%
       c(
-        "Education, scientific and research services",
-        "Genetic material",
+        # CHANGE HERE
+        # Remove dependency categories that are less relevant to your organisation
         "Nursery population and habitat maintenance",
         "Other provisioning services - Animal-based energy",
         "Other regulating and maintenance service - Dilution by atmosphere and ecosystems",
-        "Other regulating and maintenance service - Mediation of sensory impacts (other than noise)",
-        "Pollination",
-        # "Recreation related services ", # Adding for Rachel
-        # "Spiritual, artistic and symbolic services",
-        "Local (micro and meso) climate regulation",
-        "Soil quality regulation",
-        # "Visual amenity services",
-        # "Noise attenuation",
-        "Biomass provisioning"
+        "Other regulating and maintenance service - Mediation of sensory impacts (other than noise)"
       )
   ) |>
   mutate(
-    percentage_spend = case_when(
-      duplicated(percentage_spend) ~ 0, # Replace duplicates with 0
-      TRUE ~ percentage_spend
-    ), # Keep original value otherwise
+    percentage_spend = if_else(duplicated(percentage_spend), 0, percentage_spend),
     Value = if_else(Value %in% c("N/A", "ND"), "ND", Value)
-  ) # Make N/A and ND ND to simplify the plot
-```
-
-#### Create the heatmap
-
-```{r}
-# define dependency groups in order
-dep_levels <- c(
-  # ——— water together ———
-  "Water purification",
-  "Water supply",
-  "Water flow regulation",
-  # -- other materiality metrics first --
-  "Solid waste remediation",
-  "Soil and sediment retention",
-  "Biological control",
-  "Air Filtration",
-  # ——— climate & weather together ———
-  "Flood mitigation services",
-  "Storm mitigation",
-  "Global climate regulation",
-  "Rainfall pattern regulation",
-  # ——— services ———
-  "Visual amenity services",
-  "Spiritual, artistic and symbolic services",
-  "Recreation related services",
-  "Noise attenuation"
-)
-
-# Coerce Category into that order:
-unimelb_dependency_impact_2023 <- unimelb_dependency_impact_2023 |>
-  mutate(
-    Category = factor(Category, levels = dep_levels)
-  )
-
-# Re-order so highest spend is first in the data
-# and set factor levels in reverse so the highest is at the top
-unimelb_dependency_impact_ordered <- unimelb_dependency_impact_2023 |>
+  ) |>
   arrange(desc(Spend)) |>
   mutate(
-    CA_category_and_unimelb = factor(
-      CA_category_and_unimelb,
-      levels = rev(unique(CA_category_and_unimelb))
-    )
+    `ISIC Division` = factor(`ISIC Division`, levels = rev(unique(`ISIC Division`))),
+    Category = factor(Category, levels = dependency_score_cols)
   )
 
-# Creates the heatmap
-d_heatmap <- ggplot(
-  unimelb_dependency_impact_ordered,
-  aes(
-    x = Category,
-    y = CA_category_and_unimelb,
-    fill = Value
-  )
-) +
-  geom_tile(color = "white", size = 0.6) +
+# 4. Heat-map and spend bar
+d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Division`, fill = Value)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
   scale_fill_manual(
     values = pressure_colors,
     drop = FALSE,
-    name = "Materiality\nScore",
     breaks = c("ND", "VL", "L", "M", "H", "VH"),
-    labels = c(
-      "No Data",
-      "Very Low",
-      "Low",
-      "Medium",
-      "High",
-      "Very High"
-    )
+    labels = c("No Data", "Very Low", "Low", "Medium", "High", "Very High"),
+    name = "Materiality\nScore"
   ) +
-  labs(
-    x = "Dependency Category",
-    y = "Spend Category",
-    fill = "Level"
-  ) +
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 20)) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 20)) +
+  labs(x = "Dependency Category", y = "Spend Category (ISIC Rev.4 Division)") +
+  scale_x_discrete(labels = \(x) str_wrap(x, 20)) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 30)) +
   theme_minimal(base_size = 12) +
   theme(
-    axis.text.x = element_text(
-      angle = 45,
-      hjust = 1,
-      color = "black",
-      size = 12
-    ),
-    axis.text.y = element_text(color = "black", size = 12),
-    axis.title.x = element_text(face = "bold"),
-    axis.title.y = element_text(face = "bold"),
-    plot.title = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid = element_blank(),
     legend.position = "bottom",
-    legend.direction = "horizontal",
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 8)
+    legend.direction = "horizontal"
   ) +
-  guides(
-    fill = guide_legend(
-      title.position = "left",
-      nrow = 1,
-      byrow = TRUE,
-      label.position = "top",
-      keywidth = 2.2,
-      keyheight = 1.2
-    )
-  )
+  guides(fill = guide_legend(title.position = "left", nrow = 1, byrow = TRUE))
 
-# Creates the bar plot of expenditure
-d_bar <- ggplot(
-  unimelb_dependency_impact_ordered,
-  aes(
-    x = percentage_spend,
-    y = CA_category_and_unimelb
-  )
-) +
-  geom_col(fill = "#C8C8C8", color = NA) +
-  labs(
-    x = str_wrap("Percentage of Total Procurement Spend", width = 30),
-    y = NULL
-  ) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 20)) +
+d_bar <- ggplot(dependency_plot_dat, aes(percentage_spend, `ISIC Division`)) +
+  geom_col(fill = "#C8C8C8") +
+  labs(x = "Percentage of Total Procurement Spend", y = NULL) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 20)) +
   theme_minimal(base_size = 12) +
   theme(
     axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
-    plot.title = element_blank(),
-    axis.title.x = element_text(face = "bold"),
-    panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank()
   )
 
-# Combines the plots
-combined_plot_d <- d_heatmap +
-  d_bar +
-  plot_layout(widths = c(5, 1)) +
-  plot_annotation(
-    title = "Dependency Heatmap - BASED ON RANDOM DATA",
-    theme = theme(
-      plot.title = element_text(size = 14, face = "bold"),
-      plot.background = element_rect(fill = "white", color = NA)
-    )
-  )
-
-# Display the combined plot
-combined_plot_d
+combined_plot_d <- d_heatmap + d_bar + plot_layout(widths = c(4, 1))
+print(combined_plot_d)
 
 ggsave(
-  filename = "sample_dependency_plot.pdf",
-  plot = combined_plot_d,
-  width = 17,
+  "sample_outputs/sample_dependency_plot.pdf",
+  combined_plot_d,
+  width = 15,
   height = 10,
   dpi = 300
 )
 ```
 
-## Calculating Impacts by Supplier
+# Calculate materialities by supplier
 
 ```{r}
 # Process procurement_pressure dataset with worst-case materiality aggregation
@@ -1099,7 +369,11 @@ procurement_pressure_with_supplier_total <- procurement_pressure |>
     across(all_of(pressure_score_cols), ~ pick_highest_level(.x, score_levels)),
     .groups = "drop"
   ) |>
-  select(`Supplier Name`, `Total Spend`, everything()) |>
+  select(
+    `Supplier Name`,
+    `Total Spend`,
+    everything()
+  ) |>
   arrange(desc(`Total Spend`))
 
 # Process procurement_dependency dataset with worst-case materiality aggregation
@@ -1113,10 +387,7 @@ procurement_dependency_with_supplier_total <- procurement_dependency |>
   ) |>
   summarise(
     `Total Spend` = sum(Spend, na.rm = TRUE),
-    across(
-      all_of(dependency_score_cols),
-      ~ pick_highest_level(.x, score_levels)
-    ),
+    across(all_of(dependency_score_cols), ~ pick_highest_level(.x, score_levels)),
     .groups = "drop"
   ) |>
   select(
@@ -1127,29 +398,7 @@ procurement_dependency_with_supplier_total <- procurement_dependency |>
   arrange(desc(`Total Spend`))
 ```
 
-Define the unimelb_spend classifications
-
-```{r}
-# Specify unimelb classifications
-isic_summary_class <- procurement_dependency_unimelb |>
-  mutate(
-    unique_l23 = str_c(`Level 2 (Taxonomy)`, `Level 3 (Taxonomy)`, sep = "|")
-  ) |>
-  distinct(unique_l23, .keep_all = TRUE) |>
-  select(
-    `Level 1 (Taxonomy)`,
-    `Level 2 (Taxonomy)`,
-    `Level 3 (Taxonomy)`,
-    `ISIC Unique Code`,
-    `ISIC Section`,
-    `ISIC Division`,
-    `ISIC Group`,
-    `ISIC Class`,
-    `CA_category_and_unimelb`
-  )
-```
-
-## Write all data into an Excel file
+# Write all data into an Excel file
 
 ```{r}
 # Write excel file of all data
@@ -1160,13 +409,12 @@ write_xlsx(
     "Encore dependency ratings" = encore_dependency,
     "Upstream links" = upstream_links,
     "Downstream links" = downstream_links,
-    "AUPN-ISIC crosswalk" = isic_to_procurement,
-    "ISIC summary category" = isic_summary_class,
+    "AUPN-ISIC crosswalk" = procurement_to_isic,
     "Procurement & pressure" = procurement_pressure,
     "Procurement & dependency" = procurement_dependency,
     "Supplier & pressure" = procurement_pressure_with_supplier_total,
     "Supplier & dependency" = procurement_dependency_with_supplier_total
   ),
-  path = "Sample Materiality Workbook.xlsx"
+  path = "sample_outputs/Sample Materiality Workbook.xlsx"
 )
 ```
