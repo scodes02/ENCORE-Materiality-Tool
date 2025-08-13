@@ -165,31 +165,31 @@ nrow(procurement_pressure) - nrow(procurement_to_isic)
 ## Pressure heatmap
 
 ```{r}
-# 1. Aggregate worst-case pressure scores and total spend per ISIC Division
+# 1. Aggregate worst-case pressure scores and total spend per ISIC Section
 summarised_pressure_data <- procurement_pressure |>
-  group_by(`ISIC Division`) |>
+  group_by(`ISIC Section`) |>
   summarise(
     across(where(is.numeric), ~ sum(.x, na.rm = TRUE)),
     across(all_of(pressure_score_cols), ~ pick_highest_level(.x, score_levels)),
     .groups = "drop"
   ) |>
-  select(`ISIC Division`, Spend, all_of(pressure_score_cols))
+  select(`ISIC Section`, Spend, all_of(pressure_score_cols))
 
 # 2. Reshape to long format and compute share of total spend
 summarised_pressure_data_long <- summarised_pressure_data |>
   pivot_longer(
-    cols = -(c(Spend, `ISIC Division`)),
+    cols = -(c(Spend, `ISIC Section`)),
     names_to = "Category",
     values_to = "Value"
   ) |>
   mutate(
-    percentage_spend = Spend / sum(procurement$Spend, na.rm = TRUE) * 100
+    percentage_spend = Spend / sum(summarised_pressure_data$Spend, na.rm = TRUE) * 100
   )
 
 # 3. Apply materiality threshold and drop irrelevant categories
 pressure_plot_dat <- summarised_pressure_data_long |>
   filter(
-    Spend > 4e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
+    # Spend > 2e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
     !Category %in%
       c(
         # CHANGE HERE
@@ -204,13 +204,12 @@ pressure_plot_dat <- summarised_pressure_data_long |>
   ) |>
   arrange(desc(Spend)) |>
   mutate(
-    `ISIC Division` = factor(`ISIC Division`, levels = rev(unique(`ISIC Division`))),
+    `ISIC Section` = factor(`ISIC Section`, levels = rev(unique(`ISIC Section`))),
     Category = factor(Category, levels = pressure_score_cols)
   )
 
-
 # 4. Heat-map and spend bar
-p_heatmap <- ggplot(pressure_plot_dat, aes(Category, `ISIC Division`, fill = Value)) +
+p_heatmap <- ggplot(pressure_plot_dat, aes(Category, `ISIC Section`, fill = Value)) +
   geom_tile(colour = "white", linewidth = 0.6) +
   scale_fill_manual(
     values = pressure_colors,
@@ -219,9 +218,9 @@ p_heatmap <- ggplot(pressure_plot_dat, aes(Category, `ISIC Division`, fill = Val
     labels = c("No Data", "Very Low", "Low", "Medium", "High", "Very High"),
     name = "Materiality\nScore"
   ) +
-  labs(x = "Pressure Category", y = "Spend Category (ISIC Rev.4 Division)") +
+  labs(x = "Pressure Category", y = "Spend Category (ISIC Rev.4 Section)") +
   scale_x_discrete(labels = \(x) str_wrap(x, 20)) +
-  scale_y_discrete(labels = \(x) str_wrap(x, 30)) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 25)) +
   theme_minimal(base_size = 12) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -231,9 +230,9 @@ p_heatmap <- ggplot(pressure_plot_dat, aes(Category, `ISIC Division`, fill = Val
   ) +
   guides(fill = guide_legend(title.position = "left", nrow = 1, byrow = TRUE))
 
-p_bar <- ggplot(pressure_plot_dat, aes(percentage_spend, `ISIC Division`)) +
+p_bar <- ggplot(pressure_plot_dat, aes(percentage_spend, `ISIC Section`)) +
   geom_col(fill = "#C8C8C8") +
-  labs(x = "Percentage of Total Procurement Spend", y = NULL) +
+  labs(x = "Percentage of Total\nProcurement Spend", y = NULL) +
   scale_y_discrete(labels = \(x) str_wrap(x, 20)) +
   theme_minimal(base_size = 12) +
   theme(
@@ -258,16 +257,16 @@ ggsave(
 ## Dependency heatmap
 
 ```{r}
-# 1. Aggregate worst-case dependency scores and total spend per ISIC Division
+# 1. Aggregate worst-case dependency scores and total spend per ISIC Section
 summarised_dependency_data <- procurement_dependency |>
-  group_by(`ISIC Division`) |>
+  group_by(`ISIC Section`) |>
   summarise(
     across(where(is.numeric), ~ sum(.x, na.rm = TRUE)),
     across(all_of(dependency_score_cols), ~ pick_highest_level(.x, score_levels)),
     .groups = "drop"
   ) |>
   select(
-    `ISIC Division`,
+    `ISIC Section`,
     Spend,
     all_of(dependency_score_cols)
   )
@@ -275,18 +274,18 @@ summarised_dependency_data <- procurement_dependency |>
 # 2. Reshape to long format and compute share of total spend
 summarised_dependency_data_long <- summarised_dependency_data |>
   pivot_longer(
-    cols = -(c(Spend, `ISIC Division`)),
+    cols = -(c(Spend, `ISIC Section`)),
     names_to = "Category",
     values_to = "Value"
   ) |>
   mutate(
-    percentage_spend = Spend / sum(procurement$Spend, na.rm = TRUE) * 100
+    percentage_spend = Spend / sum(summarised_dependency_data$Spend, na.rm = TRUE) * 100
   )
 
 # 3. Apply materiality threshold and drop irrelevant categories
 dependency_plot_dat <- summarised_dependency_data_long |>
   filter(
-    Spend > 4e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
+    # Spend > 2e6, # CHANGE HERE -> Alter threshold for heatmap to only show the most important categories
     !Category %in%
       c(
         # CHANGE HERE
@@ -303,12 +302,12 @@ dependency_plot_dat <- summarised_dependency_data_long |>
   ) |>
   arrange(desc(Spend)) |>
   mutate(
-    `ISIC Division` = factor(`ISIC Division`, levels = rev(unique(`ISIC Division`))),
+    `ISIC Section` = factor(`ISIC Section`, levels = rev(unique(`ISIC Section`))),
     Category = factor(Category, levels = dependency_score_cols)
   )
 
 # 4. Heat-map and spend bar
-d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Division`, fill = Value)) +
+d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Section`, fill = Value)) +
   geom_tile(colour = "white", linewidth = 0.6) +
   scale_fill_manual(
     values = pressure_colors,
@@ -317,9 +316,9 @@ d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Division`, fill = V
     labels = c("No Data", "Very Low", "Low", "Medium", "High", "Very High"),
     name = "Materiality\nScore"
   ) +
-  labs(x = "Dependency Category", y = "Spend Category (ISIC Rev.4 Division)") +
+  labs(x = "Dependency Category", y = "Spend Category (ISIC Rev.4 Section)") +
   scale_x_discrete(labels = \(x) str_wrap(x, 20)) +
-  scale_y_discrete(labels = \(x) str_wrap(x, 30)) +
+  scale_y_discrete(labels = \(x) str_wrap(x, 25)) +
   theme_minimal(base_size = 12) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
@@ -329,9 +328,9 @@ d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Division`, fill = V
   ) +
   guides(fill = guide_legend(title.position = "left", nrow = 1, byrow = TRUE))
 
-d_bar <- ggplot(dependency_plot_dat, aes(percentage_spend, `ISIC Division`)) +
+d_bar <- ggplot(dependency_plot_dat, aes(percentage_spend, `ISIC Section`)) +
   geom_col(fill = "#C8C8C8") +
-  labs(x = "Percentage of Total Procurement Spend", y = NULL) +
+  labs(x = "Percentage of Total\nProcurement Spend", y = NULL) +
   scale_y_discrete(labels = \(x) str_wrap(x, 20)) +
   theme_minimal(base_size = 12) +
   theme(
@@ -340,13 +339,13 @@ d_bar <- ggplot(dependency_plot_dat, aes(percentage_spend, `ISIC Division`)) +
     panel.grid.major.y = element_blank()
   )
 
-combined_plot_d <- d_heatmap + d_bar + plot_layout(widths = c(4, 1))
+combined_plot_d <- d_heatmap + d_bar + plot_layout(widths = c(6, 1))
 print(combined_plot_d)
 
 ggsave(
   "sample_outputs/sample_dependency_plot.pdf",
   combined_plot_d,
-  width = 15,
+  width = 20,
   height = 10,
   dpi = 300
 )
