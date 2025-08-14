@@ -164,6 +164,14 @@ nrow(procurement_pressure) - nrow(procurement_to_isic)
 
 ## Pressure heatmap
 
+### Additional instructions
+
+To exclude certain ENCORE “pressures” that are immaterial or reduce the clarity of the visual, add them to the `!Category` section of the script.
+
+To filter out ISIC Sections with very small expenditures, uncomment the line
+`Spend > 2e6, # CHANGE HERE`
+and adjust the threshold to a value that is appropriate for your organisation.
+
 ```{r}
 # 1. Aggregate worst-case pressure scores and total spend per ISIC Section
 summarised_pressure_data <- procurement_pressure |>
@@ -194,8 +202,7 @@ pressure_plot_dat <- summarised_pressure_data_long |>
       c(
         # CHANGE HERE
         # Remove pressure categories that are less relevant to your organisation
-        "Other abiotic resource extraction",
-        "Other biotic resource extraction (e.g. fish, timber)"
+        # e.g. "Other abiotic resource extraction"
       )
   ) |>
   mutate(
@@ -255,6 +262,14 @@ ggsave(
 ```
 
 ## Dependency heatmap
+
+### Additional instructions
+
+To exclude certain ENCORE “ecosystem services” that are immaterial or reduce the clarity of the visual, add them to the `!Category` section of the script.
+
+To filter out ISIC Sections with very small expenditures, uncomment the line
+`Spend > 2e6, # CHANGE HERE`
+and adjust the threshold to a value that is appropriate for your organisation.
 
 ```{r}
 # 1. Aggregate worst-case dependency scores and total spend per ISIC Section
@@ -316,7 +331,7 @@ d_heatmap <- ggplot(dependency_plot_dat, aes(Category, `ISIC Section`, fill = Va
     labels = c("No Data", "Very Low", "Low", "Medium", "High", "Very High"),
     name = "Materiality\nScore"
   ) +
-  labs(x = "Dependency Category", y = "Spend Category (ISIC Rev.4 Section)") +
+  labs(x = "Ecosystem Service", y = "Spend Category (ISIC Rev.4 Section)") +
   scale_x_discrete(labels = \(x) str_wrap(x, 20)) +
   scale_y_discrete(labels = \(x) str_wrap(x, 25)) +
   theme_minimal(base_size = 12) +
